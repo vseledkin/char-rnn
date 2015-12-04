@@ -1,7 +1,7 @@
 
 local LSTM = {}
 function LSTM.lstm(input_size, rnn_size, n, dropout)
-  dropout = dropout or 0 
+  dropout = dropout or 0
 
   -- there will be 2*n+1 inputs
   local inputs = {}
@@ -18,11 +18,11 @@ function LSTM.lstm(input_size, rnn_size, n, dropout)
     local prev_h = inputs[L*2+1]
     local prev_c = inputs[L*2]
     -- the input to this layer
-    if L == 1 then 
-      x = OneHot(input_size)(inputs[1])
-      input_size_L = input_size
-    else 
-      x = outputs[(L-1)*2] 
+    if L == 1 then
+      x = nn.LookupTable(input_size,rnn_size)(inputs[1])
+      input_size_L = rnn_size
+    else
+      x = outputs[(L-1)*2]
       if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any
       input_size_L = rnn_size
     end
@@ -38,7 +38,7 @@ function LSTM.lstm(input_size, rnn_size, n, dropout)
     local forget_gate = nn.Sigmoid()(n2)
     local out_gate = nn.Sigmoid()(n3)
     -- decode the write inputs
-    local in_transform = nn.Tanh()(n4)
+    local in_transform = nn.ELU()(n4)
     -- perform the LSTM update
     local next_c           = nn.CAddTable()({
         nn.CMulTable()({forget_gate, prev_c}),
@@ -46,7 +46,7 @@ function LSTM.lstm(input_size, rnn_size, n, dropout)
       })
     -- gated cells form the output
     local next_h = nn.CMulTable()({out_gate, nn.Tanh()(next_c)})
-    
+
     table.insert(outputs, next_c)
     table.insert(outputs, next_h)
   end
@@ -62,4 +62,3 @@ function LSTM.lstm(input_size, rnn_size, n, dropout)
 end
 
 return LSTM
-

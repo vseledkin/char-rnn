@@ -3,11 +3,11 @@
 
 This file trains a character-level multi-layer RNN on text data
 
-Code is based on implementation in 
+Code is based on implementation in
 https://github.com/oxford-cs-ml-2015/practical6
 but modified to have multi-layer support, GPU support, as well as
 many other common model/optimization bells and whistles.
-The practical6 code is in turn based on 
+The practical6 code is in turn based on
 https://github.com/wojciechz/learning_to_execute
 which is turn based on other stuff in Torch, etc... (long lineage)
 
@@ -33,20 +33,20 @@ cmd:text('Train a character-level language model')
 cmd:text()
 cmd:text('Options')
 -- data
-cmd:option('-data_dir','data/tinyshakespeare','data directory. Should contain the file input.txt with input data')
+cmd:option('-data_dir','data/ru','data directory. Should contain the file input.txt with input data')
 -- model params
-cmd:option('-rnn_size', 128, 'size of LSTM internal state')
-cmd:option('-num_layers', 2, 'number of layers in the LSTM')
+cmd:option('-rnn_size', 2048, 'size of LSTM internal state')
+cmd:option('-num_layers', 1, 'number of layers in the LSTM')
 cmd:option('-model', 'lstm', 'lstm,gru or rnn')
 -- optimization
-cmd:option('-learning_rate',2e-3,'learning rate')
-cmd:option('-learning_rate_decay',0.97,'learning rate decay')
-cmd:option('-learning_rate_decay_after',10,'in number of epochs, when to start decaying the learning rate')
+cmd:option('-learning_rate',1e-4,'learning rate')
+cmd:option('-learning_rate_decay',0.99,'learning rate decay')
+cmd:option('-learning_rate_decay_after',1,'in number of epochs, when to start decaying the learning rate')
 cmd:option('-decay_rate',0.95,'decay rate for rmsprop')
-cmd:option('-dropout',0,'dropout for regularization, used after each RNN hidden layer. 0 = no dropout')
-cmd:option('-seq_length',50,'number of timesteps to unroll for')
-cmd:option('-batch_size',50,'number of sequences to train on in parallel')
-cmd:option('-max_epochs',50,'number of full passes through the training data')
+cmd:option('-dropout',0.2,'dropout for regularization, used after each RNN hidden layer. 0 = no dropout')
+cmd:option('-seq_length',64,'number of timesteps to unroll for')
+cmd:option('-batch_size',256,'number of sequences to train on in parallel')
+cmd:option('-max_epochs',1500,'number of full passes through the training data')
 cmd:option('-grad_clip',5,'clip gradients at this value')
 cmd:option('-train_frac',0.95,'fraction of data that goes into train set')
 cmd:option('-val_frac',0.05,'fraction of data that goes into validation set')
@@ -57,7 +57,7 @@ cmd:option('-seed',123,'torch manual random number generator seed')
 cmd:option('-print_every',1,'how many steps/minibatches between printing out the loss')
 cmd:option('-eval_val_every',1000,'every how many iterations should we evaluate on validation data?')
 cmd:option('-checkpoint_dir', 'cv', 'output directory where checkpoints get written')
-cmd:option('-savefile','lstm','filename to autosave the checkpont to. Will be inside checkpoint_dir/')
+cmd:option('-savefile','elu','filename to autosave the checkpont to. Will be inside checkpoint_dir/')
 cmd:option('-accurate_gpu_timing',0,'set this flag to 1 to get precise timings when using GPU. Might make code bit slower but reports accurate timings.')
 -- GPU/CPU
 cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
@@ -69,7 +69,7 @@ opt = cmd:parse(arg)
 torch.manualSeed(opt.seed)
 -- train / val / test split for data, in fractions
 local test_frac = math.max(0, 1 - (opt.train_frac + opt.val_frac))
-local split_sizes = {opt.train_frac, opt.val_frac, test_frac} 
+local split_sizes = {opt.train_frac, opt.val_frac, test_frac}
 
 -- initialize cunn/cutorch for training on the GPU and fall back to CPU gracefully
 if opt.gpuid >= 0 and opt.opencl == 0 then
@@ -112,6 +112,7 @@ local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, o
 local vocab_size = loader.vocab_size  -- the number of distinct characters
 local vocab = loader.vocab_mapping
 print('vocab size: ' .. vocab_size)
+print(vocab)
 -- make sure output directory exists
 if not path.exists(opt.checkpoint_dir) then lfs.mkdir(opt.checkpoint_dir) end
 
@@ -123,8 +124,8 @@ if string.len(opt.init_from) > 0 then
     protos = checkpoint.protos
     -- make sure the vocabs are the same
     local vocab_compatible = true
-    for c,i in pairs(checkpoint.vocab) do 
-        if not vocab[c] == i then 
+    for c,i in pairs(checkpoint.vocab) do
+        if not vocab[c] == i then
             vocab_compatible = false
         end
     end
@@ -220,7 +221,7 @@ function eval_split(split_index, max_batches)
     loader:reset_batch_pointer(split_index) -- move batch iteration pointer for this split to front
     local loss = 0
     local rnn_state = {[0] = init_state}
-    
+
     for i = 1,n do -- iterate over batches in the split
         -- fetch a batch
         local x, y = loader:next_batch(split_index)
@@ -231,7 +232,7 @@ function eval_split(split_index, max_batches)
             local lst = clones.rnn[t]:forward{x[t], unpack(rnn_state[t-1])}
             rnn_state[t] = {}
             for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
-            prediction = lst[#lst] 
+            prediction = lst[#lst]
             loss = loss + clones.criterion[t]:forward(prediction, y[t])
         end
         -- carry over lstm state
@@ -278,7 +279,7 @@ function feval(x)
         drnn_state[t-1] = {}
         for k,v in pairs(dlst) do
             if k > 1 then -- k == 1 is gradient on x, which we dont need
-                -- note we do k-1 because first item is dembeddings, and then follow the 
+                -- note we do k-1 because first item is dembeddings, and then follow the
                 -- derivatives of the state, starting at index 2. I know...
                 drnn_state[t-1][k-1] = v
             end
@@ -304,6 +305,7 @@ for i = 1, iterations do
     local epoch = i / loader.ntrain
 
     local timer = torch.Timer()
+		optim_state.learningRate = dofile("lr.lua")()
     local _, loss = optim.rmsprop(feval, params, optim_state)
     if opt.accurate_gpu_timing == 1 and opt.gpuid >= 0 then
         --[[
@@ -314,7 +316,7 @@ for i = 1, iterations do
         cutorch.synchronize()
     end
     local time = timer:time().real
-    
+
     local train_loss = loss[1] -- the loss is inside a list, pop it
     train_losses[i] = train_loss
 
@@ -348,9 +350,9 @@ for i = 1, iterations do
     end
 
     if i % opt.print_every == 0 then
-        print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.4fs", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time))
+        print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.4fs lr = %6.8f", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time, optim_state.learningRate))
     end
-   
+
     if i % 10 == 0 then collectgarbage() end
 
     -- handle early stopping if things are going really bad
@@ -364,5 +366,3 @@ for i = 1, iterations do
         break -- halt
     end
 end
-
-
