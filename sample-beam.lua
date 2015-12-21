@@ -25,7 +25,7 @@ cmd:text('Options')
 -- required:
 cmd:argument('-model','model checkpoint to use for sampling')
 -- optional parameters
-cmd:option('-beam',3,'beam width')
+cmd:option('-beam',2,'beam width')
 cmd:option('-beamsample',1,'sample from the beam rather than overwriting the lowest probability candidate')
 cmd:option('-seed',123,'random number generator\'s seed')
 cmd:option('-sample',1,' 0 to use max at each timestep, 1 to sample at each timestep')

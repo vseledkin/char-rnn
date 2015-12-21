@@ -38,7 +38,7 @@ function LSTM.lstm(input_size, rnn_size, n, dropout)
     local forget_gate = nn.Sigmoid()(n2)
     local out_gate = nn.Sigmoid()(n3)
     -- decode the write inputs
-    local in_transform = nn.ELU()(n4)
+    local in_transform = nn.Tanh()(n4)
     -- perform the LSTM update
     local next_c           = nn.CAddTable()({
         nn.CMulTable()({forget_gate, prev_c}),
