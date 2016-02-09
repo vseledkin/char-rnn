@@ -26,6 +26,7 @@ local model_utils = require 'util.model_utils'
 local LSTM = require 'model.LSTM'
 local GRU = require 'model.GRU'
 local RNN = require 'model.RNN'
+local MY_PATH = string.gsub(debug.getinfo(1).source, "^@(.+/)[^/]+$", "%1");
 
 cmd = torch.CmdLine()
 cmd:text()
@@ -305,7 +306,7 @@ for i = 1, iterations do
     local epoch = i / loader.ntrain
 
     local timer = torch.Timer()
-		optim_state.learningRate = dofile("lr.lua")()
+		optim_state.learningRate = dofile(MY_PATH.."lr.lua")()
     local _, loss = optim.rmsprop(feval, params, optim_state)
     if opt.accurate_gpu_timing == 1 and opt.gpuid >= 0 then
         --[[
