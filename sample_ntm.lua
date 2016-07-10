@@ -16,6 +16,8 @@ require 'lfs'
 
 require 'util.OneHot'
 require 'util.misc'
+require 'model.Print'
+require 'model.NTM'
 
 cmd = torch.CmdLine()
 cmd:text()
@@ -28,7 +30,7 @@ cmd:argument('-model','model checkpoint to use for sampling')
 cmd:option('-seed',123,'random number generator\'s seed')
 cmd:option('-sample',1,' 0 to use max at each timestep, 1 to sample at each timestep')
 cmd:option('-primetext',"",'used as a prompt to "seed" the state of the LSTM using a given sequence, before we sample.')
-cmd:option('-length',500,'number of characters to sample')
+cmd:option('-length',2000,'number of characters to sample')
 cmd:option('-temperature',1,'temperature of sampling')
 cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
 cmd:option('-opencl',0,'use OpenCL (instead of CUDA)')
@@ -96,12 +98,13 @@ for c,i in pairs(vocab) do ivocab[i] = c end
 gprint('creating an ' .. checkpoint.opt.model .. '...')
 
 local current_state = {}
-for L=1,opt.num_layers do
-    local h_init = torch.zeros(1, opt.rnn_size)
+print(opt)
+for L=1,checkpoint.opt.num_layers do
+    local h_init = torch.zeros(1, checkpoint.opt.rnn_size)
     if opt.gpuid >=0 and opt.opencl == 0 then h_init = h_init:cuda() end
     if opt.gpuid >=0 and opt.opencl == 1 then h_init = h_init:cl() end
     if opt.model == 'lstmex' then
-      local m_init = torch.zeros(1, opt.lstmex_memory_slots ,opt.rnn_size)
+      local m_init = torch.zeros(1, checkpoint.opt.lstmex_memory_slots ,opt.rnn_size)
       if opt.gpuid >=0 and opt.opencl == 0 then m_init = m_init:cuda() end
       if opt.gpuid >=0 and opt.opencl == 1 then m_init = m_init:cl() end
       table.insert(current_state, m_init:clone())
@@ -109,7 +112,7 @@ for L=1,opt.num_layers do
     else
       table.insert(current_state, h_init:clone())
     end
-    if opt.model == 'lstm' then
+    if checkpoint.opt.model == 'lstm' then
         table.insert(current_state, h_init:clone())
     end
 end
@@ -147,7 +150,7 @@ for i=1, opt.length do
     -- log probabilities from the previous timestep
     if opt.sample == 0 then
         -- use argmax
-        local _, prev_char_ = prediction:max(2)
+        local _, prev_char_ = prediction:squeeze():max(1)
         prev_char = prev_char_:resize(1)
     else
         -- use sampling
@@ -158,10 +161,7 @@ for i=1, opt.length do
     end
 
     -- forward the rnn for next character
-    local lst = protos.rnn:forward{prev_char, unpack(current_state)}
-    current_state = {}
-    for i=1,state_size do table.insert(current_state, lst[i]) end
-    prediction = lst[#lst] -- last element holds the log probabilities
+    prediction = protos.rnn:f(prev_char)
 
     io.write(ivocab[prev_char[1]])
 end
