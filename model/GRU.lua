@@ -6,6 +6,7 @@ Creates one timestep of one GRU
 Paper reference: http://arxiv.org/pdf/1412.3555v1.pdf
 ]]--
 function GRU.gru(input_size, rnn_size, n, dropout)
+  print(input_size,rnn_size,n)
   dropout = dropout or 0
   -- there are n+1 inputs (hiddens on each layer and x)
   local inputs = {}
@@ -27,9 +28,10 @@ function GRU.gru(input_size, rnn_size, n, dropout)
     local prev_h = inputs[L+1]
     -- the input to this layer
     if L == 1 then
-      print(input_size)
+      --print(input_size)
       x = nn.LookupTable(input_size,rnn_size)(inputs[1])
-      input_size_L = input_size
+      --x = OneHot(input_size)(inputs[1])
+      input_size_L = rnn_size
     else
       x = outputs[(L-1)]
       if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any

@@ -12,7 +12,7 @@ function Print:updateOutput(input)
   if self.label ~= nil then
     print(self.label)
   end
-  print(input)
+  print(input[1])
   return self.output
 end
 function Print:updateGradInput(input, gradOutput)

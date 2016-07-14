@@ -127,7 +127,7 @@ end
 -- *** STATIC method ***
 function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, out_tensorfile)
     local timer = torch.Timer()
-    print('loading text file...')
+    print('loading text file... ' .. in_textfile)
     local cache_len = 10000
     local line
     local tot_len = 0

@@ -27,7 +27,7 @@ require "./CircularConvolution"
 require "./PowTable"
 require "./NormalizeBySum"
 require "./OuterProd"
-require "./Squeeze"
+
 
 local function share_params(cell, src, ...)
   for i = 1, #cell.forwardnodes do
@@ -44,7 +44,7 @@ function NTM:__init(config)
   self.input_dim   = config.input_dim   or error('config.input_dim must be specified')
   self.output_dim  = config.output_dim  or error('config.output_dim must be specified')
   self.mem_rows    = config.mem_rows    or 20
-  self.mem_cols    = config.mem_cols    or 128
+  self.mem_cols    = config.mem_cols    or 64
   self.cont_dim    = config.cont_dim    or 128
   self.cont_layers = config.cont_layers or 1
   self.shift_range = config.shift_range or 1

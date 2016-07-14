@@ -24,7 +24,8 @@ require 'util.misc'
 local CharSplitLMMinibatchLoader = require 'util.CharSplitLMMinibatchLoader'
 local model_utils = require 'util.model_utils'
 local LSTM = require 'model.LSTM'
-local LSTMEX = require 'model.LSTMEX'
+local LSTMEX = require 'model.LSTME'
+--local LSTMEX = require 'model.LSTME'
 local LSTMNTM = require 'model.LSTMNTM'
 local GRU = require 'model.GRU'
 local RNN = require 'model.RNN'
@@ -36,14 +37,14 @@ cmd:text('Train a character-level language model')
 cmd:text()
 cmd:text('Options')
 -- data
-cmd:option('-data_dir','data/stixi','data directory. Should contain the file input.txt with input data')
+cmd:option('-data_dir','data/ru','data directory. Should contain the file input.txt with input data')
 -- model params
-cmd:option('-rnn_size', 127, 'size of LSTM internal state')
+cmd:option('-rnn_size', 32, 'size of LSTM internal state')
 cmd:option('-num_layers', 1, 'number of layers in the LSTM')
-cmd:option('-lstmex_memory_slots', 3, 'number of LSTM internal memory slots')
-cmd:option('-model', 'gru', 'lstm, gru or rnn, lstmex or ntm or lstmntm')
+cmd:option('-lstmex_memory_slots', 16, 'number of LSTM internal memory slots')
+cmd:option('-model', 'lstmex', 'lstm, gru or rnn, lstmex or ntm or lstmntm')
 -- optimization
-cmd:option('-learning_rate',5e-5,'learning rate')
+cmd:option('-learning_rate',1e-3,'learning rate')
 cmd:option('-learning_rate_decay',0.97,'learning rate decay')
 cmd:option('-learning_rate_decay_after',10,'in number of epochs, when to start decaying the learning rate')
 cmd:option('-decay_rate',0.95,'decay rate for rmsprop')
@@ -52,14 +53,14 @@ cmd:option('-seq_length',50,'number of timesteps to unroll for')
 cmd:option('-batch_size',128,'number of sequences to train on in parallel')
 cmd:option('-max_epochs',50,'number of full passes through the training data')
 cmd:option('-grad_clip',5,'clip gradients at this value')
-cmd:option('-train_frac',0.95,'fraction of data that goes into train set')
-cmd:option('-val_frac',0.05,'fraction of data that goes into validation set')
+cmd:option('-train_frac',0.99,'fraction of data that goes into train set')
+cmd:option('-val_frac',0.01,'fraction of data that goes into validation set')
             -- test_frac will be computed as (1 - train_frac - val_frac)
 cmd:option('-init_from', '', 'initialize network parameters from checkpoint at this path')
 -- bookkeeping
 cmd:option('-seed',123,'torch manual random number generator seed')
 cmd:option('-print_every',1,'how many steps/minibatches between printing out the loss')
-cmd:option('-eval_val_every',1000,'every how many iterations should we evaluate on validation data?')
+cmd:option('-eval_val_every',100,'every how many iterations should we evaluate on validation data?')
 cmd:option('-checkpoint_dir', 'cv', 'output directory where checkpoints get written')
 cmd:option('-savefile','model','filename to autosave the checkpont to. Will be inside checkpoint_dir/')
 -- GPU/CPU
@@ -97,7 +98,7 @@ local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, o
 local vocab_size = loader.vocab_size  -- the number of distinct characters
 local vocab = loader.vocab_mapping
 print('vocab size: ' .. vocab_size)
-print(vocab)
+--print(vocab)
 -- make sure output directory exists
 if not path.exists(opt.checkpoint_dir) then lfs.mkdir(opt.checkpoint_dir) end
 
@@ -126,7 +127,7 @@ else
     if opt.model == 'lstm' then
         protos.rnn = LSTM.lstm(vocab_size, opt.rnn_size, opt.num_layers, opt.dropout)
     elseif opt.model == 'lstmex' then
-        protos.rnn = LSTMEX.lstm2(vocab_size, opt.rnn_size, opt.num_layers, opt.dropout, opt.lstmex_memory_slots)
+        protos.rnn = LSTMEX.lstm(vocab_size, opt.rnn_size, opt.num_layers, opt.dropout, opt.lstmex_memory_slots)
     elseif opt.model == 'ntm' then
       local ntm_conf = {
         input_dim = vocab_size,
@@ -202,10 +203,6 @@ function prepro(x,y)
         x = x:float():cuda()
         y = y:float():cuda()
     end
-    if opt.gpuid >= 0 and opt.opencl == 1 then -- ship the input arrays to GPU
-        x = x:cl()
-        y = y:cl()
-    end
     return x,y
 end
 
@@ -258,12 +255,14 @@ function feval(x)
     local loss = 0
     for t=1,opt.seq_length do
         clones.rnn[t]:training() -- make sure we are in correct mode (this is cheap, sets flag)
+        --print(x[t])
         local lst = clones.rnn[t]:forward{x[t], unpack(rnn_state[t-1])}
         rnn_state[t] = {}
         for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
         predictions[t] = lst[#lst] -- last element is the prediction
         loss = loss + clones.criterion[t]:forward(predictions[t], y[t])
     end
+    --os.exit(0)
     loss = loss / opt.seq_length
     ------------------ backward pass -------------------
     -- initialize gradient at time t to be zeros (there's no influence from future)
@@ -339,7 +338,7 @@ for i = 1, iterations do
     end
 
     if i % opt.print_every == 0 then
-        print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.2fs", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time))
+        print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.2fs %f", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time, optim_state.learningRate))
     end
 
     if i % 10 == 0 then collectgarbage() end

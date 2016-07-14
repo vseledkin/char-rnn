@@ -16,7 +16,7 @@ require 'lfs'
 
 require 'util.OneHot'
 require 'util.misc'
-
+require "./model/Print.lua"
 cmd = torch.CmdLine()
 cmd:text()
 cmd:text('Sample from a character-level language model')
@@ -96,12 +96,12 @@ for c,i in pairs(vocab) do ivocab[i] = c end
 gprint('creating an ' .. checkpoint.opt.model .. '...')
 
 local current_state = {}
-for L=1,opt.num_layers do
-    local h_init = torch.zeros(1, opt.rnn_size)
+for L=1,checkpoint.opt.num_layers do
+    local h_init = torch.zeros(1, checkpoint.opt.rnn_size)
     if opt.gpuid >=0 and opt.opencl == 0 then h_init = h_init:cuda() end
     if opt.gpuid >=0 and opt.opencl == 1 then h_init = h_init:cl() end
-    if opt.model == 'lstmex' then
-      local m_init = torch.zeros(1, opt.lstmex_memory_slots ,opt.rnn_size)
+    if checkpoint.opt.model == 'lstmex' then
+      local m_init = torch.zeros(1, checkpoint.opt.lstmex_memory_slots ,checkpoint.opt.rnn_size)
       if opt.gpuid >=0 and opt.opencl == 0 then m_init = m_init:cuda() end
       if opt.gpuid >=0 and opt.opencl == 1 then m_init = m_init:cl() end
       table.insert(current_state, m_init:clone())
