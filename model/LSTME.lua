@@ -85,8 +85,14 @@ function LSTMEX.lstm(input_size, rnn_size, n, dropout,mems)
     attn = nn.SoftMax()(attn):annotate{name="Attention"}
     next_h = nn.MV(true)({next_h,attn})
 --]]
-    next_h = nn.Max(2)(next_h)
+    next_h = nn.SpatialAveragePooling(2, 2)(next_h)
+    next_h = nn.PrintSize("next_h")(next_h)
+    next_h = nn.Reshape(-1,mems*rnn_size/4)(next_h)
+    next_h = nn.Squeeze()(next_h)
     --next_h = nn.PrintSize("next_h")(next_h)
+    next_h = nn.Linear(mems*rnn_size/4,rnn_size)(next_h)
+    --next_h = nn.PrintSize("next_h")(next_h)
+    --next_h = nn.Print("next_h")(next_h)
     table.insert(outputs, next_c)
     table.insert(outputs, next_h)
   end

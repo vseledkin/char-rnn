@@ -39,10 +39,10 @@ cmd:text('Options')
 -- data
 cmd:option('-data_dir','data/ru','data directory. Should contain the file input.txt with input data')
 -- model params
-cmd:option('-rnn_size', 32, 'size of LSTM internal state')
+cmd:option('-rnn_size', 128, 'size of LSTM internal state')
 cmd:option('-num_layers', 1, 'number of layers in the LSTM')
 cmd:option('-lstmex_memory_slots', 16, 'number of LSTM internal memory slots')
-cmd:option('-model', 'lstmex', 'lstm, gru or rnn, lstmex or ntm or lstmntm')
+cmd:option('-model', 'lstm', 'lstm, gru or rnn, lstmex or ntm or lstmntm')
 -- optimization
 cmd:option('-learning_rate',1e-3,'learning rate')
 cmd:option('-learning_rate_decay',0.97,'learning rate decay')
